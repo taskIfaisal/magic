@@ -27,14 +27,12 @@ function getBackImageSrc() {
 
 // Fungsi untuk membuat kartu memiliki 2 sisi (front dan back)
 function setupFlipCard() {
-    // Simpan src asli kartu
-    const currentSrc = card.src;
-    const currentWidth = card.offsetWidth;
-    const currentHeight = card.offsetHeight;
-    
     // Simpan posisi saat ini
     const currentPosX = posX;
     const currentPosY = posY;
+    const currentScale = scale;
+    const currentWidth = card.offsetWidth;
+    const currentHeight = card.offsetHeight;
     
     // Hapus semua child
     while (card.firstChild) {
@@ -48,6 +46,7 @@ function setupFlipCard() {
     card.style.width = currentWidth + 'px';
     card.style.height = currentHeight + 'px';
     card.style.display = 'block';
+    card.style.maxWidth = currentCardSize + 'px';
     
     // Buat front side
     const frontDiv = document.createElement('div');
@@ -80,22 +79,45 @@ function setupFlipCard() {
     card.appendChild(backDiv);
     
     // Kembalikan posisi
-    card.style.transform = `translate(${currentPosX}px, ${currentPosY}px) scale(${scale})`;
+    card.style.transform = `translate(${currentPosX}px, ${currentPosY}px) scale(${currentScale})`;
 }
 
-// Kembalikan kartu ke mode normal (tanpa flip 3D) tapi tetap dalam flip card structure
-function resetToFrontSide() {
+// Kembalikan kartu ke mode normal (image biasa)
+function teardownFlipCard() {
     if (!card) return;
     
     // Hapus class flip
     card.classList.remove('flip');
     isFlipping = false;
     
-    // Update front image dengan gambar saat ini
+    // Ambil src dari front image
     const frontDiv = card.querySelector('.card-front');
-    if (frontDiv && currentCardImageIndex < activeImagesList.length) {
-        frontDiv.style.backgroundImage = `url('${activeImagesList[currentCardImageIndex].src}')`;
+    let currentSrc = '';
+    if (frontDiv) {
+        const bgImage = frontDiv.style.backgroundImage;
+        currentSrc = bgImage.replace(/url\(["']?|["']?\)/g, '');
     }
+    
+    // Hapus innerHTML
+    while (card.firstChild) {
+        card.removeChild(card.firstChild);
+    }
+    
+    // Reset style card
+    card.style.transformStyle = '';
+    card.style.transition = '';
+    card.style.position = 'absolute';
+    card.style.width = 'auto';
+    card.style.height = 'auto';
+    card.style.display = 'block';
+    
+    // Set gambar kembali
+    if (currentSrc && currentSrc !== '') {
+        card.src = currentSrc;
+    }
+    
+    // Update transform
+    updateCardTransform();
 }
 
 // Fungsi exit kartu ke atas (seperti skating)
@@ -206,10 +228,13 @@ function flipToSecondImage() {
     
     // Cek apakah gambar ke-2 tersedia (preview-2 aktif)
     const backImageSrc = getBackImageSrc();
-    if (!backImageSrc || activeImagesList.length < 2) {
-        // Jika tidak ada gambar ke-2, langsung ke gambar ke-3
+    if (!backImageSrc || backImageSrc === '' || activeImagesList.length < 2) {
+        // Jika tidak ada gambar ke-2, langsung ke gambar ke-3 jika ada
         if (activeImagesList.length >= 3) {
             goToNextImageFlip(0);
+            hasFlippedToSecond = true;
+        } else if (activeImagesList.length === 2) {
+            // Hanya ada 2 gambar, setelah flip selesai, schedule exit
             hasFlippedToSecond = true;
         }
         return false;
@@ -245,6 +270,13 @@ function flipToSecondImage() {
         hasFlippedToSecond = true;
         isFlipping = false;
         flipAnimationTimeout = null;
+        
+        // Jika hanya ada 2 gambar dan sudah flip, schedule exit
+        if (activeImagesList.length === 2) {
+            isSequenceActive = false;
+            sequenceStage = 0;
+            scheduleExitFlip();
+        }
         
     }, 600);
     
@@ -297,14 +329,16 @@ function handleFlipCardTap() {
             if (isSequenceActive) {
                 const success = goToNextImageFlip(currentCardImageIndex);
                 if (!success) {
+                    // Semua gambar sudah habis
                     isSequenceActive = false;
                     sequenceStage = 0;
+                    scheduleExitFlip();
                 }
             }
             touchToChangeTimeout = null;
         }, 3000);
     } else {
-        // Semua gambar sudah habis, schedule exit ke atas
+        // Semua gambar sudah habis
         isSequenceActive = false;
         sequenceStage = 0;
         scheduleExitFlip();
@@ -328,48 +362,21 @@ function clearFlipTimeouts() {
     if (card) card.classList.remove('flip');
 }
 
-// Cleanup - kembalikan kartu ke bentuk img biasa
-function teardownFlipCard() {
-    if (!card) return;
-    
-    // Hapus class flip
-    card.classList.remove('flip');
-    isFlipping = false;
-    
-    // Ambil src dari front image
-    const frontDiv = card.querySelector('.card-front');
-    let currentSrc = '';
-    if (frontDiv) {
-        const bgImage = frontDiv.style.backgroundImage;
-        currentSrc = bgImage.replace(/url\(["']?|["']?\)/g, '');
-    }
-    
-    // Hapus innerHTML
-    while (card.firstChild) {
-        card.removeChild(card.firstChild);
-    }
-    
-    // Reset style card
-    card.style.transformStyle = '';
-    card.style.transition = '';
-    card.style.position = 'absolute';
-    card.style.width = 'auto';
-    card.style.height = 'auto';
-    card.style.display = 'block';
-    
-    // Set gambar kembali
-    if (currentSrc) {
-        card.src = currentSrc;
-    }
-    
-    // Update transform
-    updateCardTransform();
-}
-
-// Fungsi untuk membersihkan effect saat double tap baru
+// Reset flip effect untuk double tap baru
 function resetFlipEffect() {
+    // Bersihkan semua timeout
     clearFlipTimeouts();
-    teardownFlipCard();
+    
+    // Reset flag
     hasFlippedToSecond = false;
     isFlipAnimating = false;
+    
+    // Kembalikan kartu ke mode normal (jika sedang dalam mode flip card)
+    if (card && card.querySelector('.card-front')) {
+        teardownFlipCard();
+    }
 }
+
+// Ekspos fungsi ke global
+window.resetFlipEffect = resetFlipEffect;
+window.clearFlipTimeouts = clearFlipTimeouts;
