@@ -33,6 +33,7 @@
     let lastPosX = 0, lastPosY = 0;
     let lastTime = 0;
     let lastTap = 0;
+    let lastTapTime = 0;
     let posX = window.innerWidth / 2 - 100;
     let posY = window.innerHeight + 200;
     let scale = 1;
@@ -106,10 +107,18 @@
         const preview3Img = preview3.querySelector('img');
         const preview4Img = preview4.querySelector('img');
         
-        if (activeImages[1] && preview1Img && preview1Img.src) list.push({ index: 1, src: preview1Img.src });
-        if (activeImages[2] && preview2Img && preview2Img.src) list.push({ index: 2, src: preview2Img.src });
-        if (activeImages[3] && preview3Img && preview3Img.src) list.push({ index: 3, src: preview3Img.src });
-        if (activeImages[4] && preview4Img && preview4Img.src) list.push({ index: 4, src: preview4Img.src });
+        if (activeImages[1] && preview1Img && preview1Img.src && !preview1Img.src.includes('undefined')) {
+            list.push({ index: 1, src: preview1Img.src });
+        }
+        if (activeImages[2] && preview2Img && preview2Img.src && !preview2Img.src.includes('undefined')) {
+            list.push({ index: 2, src: preview2Img.src });
+        }
+        if (activeImages[3] && preview3Img && preview3Img.src && !preview3Img.src.includes('undefined')) {
+            list.push({ index: 3, src: preview3Img.src });
+        }
+        if (activeImages[4] && preview4Img && preview4Img.src && !preview4Img.src.includes('undefined')) {
+            list.push({ index: 4, src: preview4Img.src });
+        }
         
         return list;
     }
@@ -576,10 +585,13 @@
     }
     
     function triggerDoubleTapEffect() {
+        console.log("Double tap triggered!"); // For debugging
+        
         clearAllTimeouts();
         hideIndicator();
         
         if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
+            console.log("Shadow effect triggered");
             isSequenceActive = true;
             sequenceStage = 1;
             
@@ -591,6 +603,7 @@
             }, 5000);
             
         } else if (effectStandarCheckbox && effectStandarCheckbox.checked) {
+            console.log("Standar effect triggered");
             isSequenceActive = false;
             
             sequenceTimer = setTimeout(() => {
@@ -599,6 +612,7 @@
             }, 1000);
             
         } else if (effectSliderCheckbox && effectSliderCheckbox.checked) {
+            console.log("Slider effect triggered");
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -612,6 +626,7 @@
             }, totalDelay);
             
         } else if (effectSkatingCheckbox && effectSkatingCheckbox.checked) {
+            console.log("Skating effect triggered");
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -623,10 +638,14 @@
                 hideIndicator();
                 showCardSkating();
             }, totalDelay);
+        } else {
+            console.log("No effect selected!");
         }
     }
     
     function handleCardTap() {
+        console.log("Single tap triggered, isSequenceActive:", isSequenceActive, "isCardVisible:", isCardVisible());
+        
         if (!isSequenceActive || !isCardVisible()) return;
         
         if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
@@ -745,6 +764,7 @@
     }
     
     function onTouchEnd(e) {
+        // Handle drag end
         if (isDragging) {
             const cardRect = card.getBoundingClientRect();
             
@@ -797,22 +817,34 @@
             updateCardTransform();
         }
         
-        // Double tap detection
+        // ========== DOUBLE TAP DETECTION (CRITICAL FIX) ==========
         const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
+        const tapGap = currentTime - lastTapTime;
         
-        if (tapLength < 300 && tapLength > 0) {
+        console.log("Tap detected, gap:", tapGap, "ms");
+        
+        // Double tap if gap is less than 300ms (not too short, not too long)
+        if (tapGap < 300 && tapGap > 10) {
+            console.log("DOUBLE TAP DETECTED!");
             e.preventDefault();
             triggerDoubleTapEffect();
-        }
-        lastTap = currentTime;
-        
-        // Handle single tap on card for image change (with delay)
-        setTimeout(() => {
-            if (isCardVisible()) {
-                handleCardTap();
+            lastTapTime = 0; // Reset to prevent triple tap detection
+        } else {
+            // Single tap - handle after a short delay to confirm it's not a double tap
+            if (tapGap > 300 || lastTapTime === 0) {
+                setTimeout(() => {
+                    // Only trigger single tap if another tap didn't come within 300ms
+                    const now = new Date().getTime();
+                    const timeSinceLastTap = now - lastTapTime;
+                    if (timeSinceLastTap > 300 || timeSinceLastTap === 0) {
+                        console.log("SINGLE TAP DETECTED");
+                        handleCardTap();
+                    }
+                }, 50);
             }
-        }, 50);
+        }
+        
+        lastTapTime = currentTime;
     }
     
     // ========== SENSOR HANDLER ==========
@@ -1056,6 +1088,7 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === '1' || event.key === '2') {
                 event.preventDefault();
+                console.log("Key pressed:", event.key);
                 if (event.key === '1') {
                     handleCardTap();
                 } else if (event.key === '2') {
