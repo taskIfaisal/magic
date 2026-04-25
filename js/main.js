@@ -22,6 +22,7 @@ const effectStandarCheckbox = document.getElementById('effect-standar');
 const shadowEffectCheckbox = document.getElementById('shadow-effect');
 const effectSliderCheckbox = document.getElementById('effect-slider');
 const effectSkatingCheckbox = document.getElementById('effect-skating');
+const effectFlipCheckbox = document.getElementById('effect-flip');
 const sensorGerakCheckbox = document.getElementById('sensor-gerak');
 
 const removeBgBtn = document.getElementById('remove-bg-btn');
@@ -204,6 +205,19 @@ function triggerCardTap() {
             scheduleExitSkating();
         }
     }
+    else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+        if (sequenceStage < activeCount) {
+            touchToChangeTimeout = setTimeout(() => {
+                if (isSequenceActive) {
+                    flipToNextImage();
+                }
+                touchToChangeTimeout = null;
+            }, 3000);
+        } else {
+            isSequenceActive = false;
+            sequenceStage = 0;
+        }
+    }
 }
 
 function triggerDoubleTapEffect() {
@@ -254,6 +268,14 @@ function triggerDoubleTapEffect() {
             hideIndicator();
             showCardSkating();
         }, totalDelay);
+        
+    } else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+        isSequenceActive = false;
+        
+        sequenceTimer = setTimeout(() => {
+            showCardFlip();
+            sequenceTimer = null;
+        }, 1000);
     }
 }
 
@@ -554,6 +576,7 @@ function loadFromStorage() {
             if (data.shadowEffect !== undefined) shadowEffectCheckbox.checked = data.shadowEffect;
             if (data.effectSlider !== undefined) effectSliderCheckbox.checked = data.effectSlider;
             if (data.effectSkating !== undefined) effectSkatingCheckbox.checked = data.effectSkating;
+            if (data.effectFlip !== undefined && effectFlipCheckbox) effectFlipCheckbox.checked = data.effectFlip;
             if (data.sensorGerak !== undefined) {
                 sensorGerakCheckbox.checked = data.sensorGerak;
                 isSensorActive = data.sensorGerak;
@@ -614,6 +637,7 @@ function saveToStorage() {
             shadowEffect: shadowEffectCheckbox.checked,
             effectSlider: effectSliderCheckbox.checked,
             effectSkating: effectSkatingCheckbox.checked,
+            effectFlip: effectFlipCheckbox ? effectFlipCheckbox.checked : false,
             sensorGerak: sensorGerakCheckbox.checked,
             activeImages: activeImages,
             preview1: preview1Img ? preview1Img.src : '',
@@ -632,11 +656,13 @@ function autoSave() {
     saveToStorage();
 }
 
+// Effect checkboxes mutual exclusion
 effectStandarCheckbox.addEventListener('change', (e) => {
     if (effectStandarCheckbox.checked) {
         shadowEffectCheckbox.checked = false;
         effectSliderCheckbox.checked = false;
         effectSkatingCheckbox.checked = false;
+        if (effectFlipCheckbox) effectFlipCheckbox.checked = false;
     }
     autoSave();
 });
@@ -646,6 +672,7 @@ shadowEffectCheckbox.addEventListener('change', (e) => {
         effectStandarCheckbox.checked = false;
         effectSliderCheckbox.checked = false;
         effectSkatingCheckbox.checked = false;
+        if (effectFlipCheckbox) effectFlipCheckbox.checked = false;
     }
     autoSave();
 });
@@ -655,6 +682,7 @@ effectSliderCheckbox.addEventListener('change', (e) => {
         effectStandarCheckbox.checked = false;
         shadowEffectCheckbox.checked = false;
         effectSkatingCheckbox.checked = false;
+        if (effectFlipCheckbox) effectFlipCheckbox.checked = false;
     }
     autoSave();
 });
@@ -664,9 +692,22 @@ effectSkatingCheckbox.addEventListener('change', (e) => {
         effectStandarCheckbox.checked = false;
         shadowEffectCheckbox.checked = false;
         effectSliderCheckbox.checked = false;
+        if (effectFlipCheckbox) effectFlipCheckbox.checked = false;
     }
     autoSave();
 });
+
+if (effectFlipCheckbox) {
+    effectFlipCheckbox.addEventListener('change', (e) => {
+        if (effectFlipCheckbox.checked) {
+            effectStandarCheckbox.checked = false;
+            shadowEffectCheckbox.checked = false;
+            effectSliderCheckbox.checked = false;
+            effectSkatingCheckbox.checked = false;
+        }
+        autoSave();
+    });
+}
 
 sensorGerakCheckbox.addEventListener('change', (e) => {
     isSensorActive = sensorGerakCheckbox.checked;
@@ -745,6 +786,14 @@ document.addEventListener('touchend', (e) => {
                 hideIndicator();
                 showCardSkating();
             }, totalDelay);
+            
+        } else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+            isSequenceActive = false;
+            
+            sequenceTimer = setTimeout(() => {
+                showCardFlip();
+                sequenceTimer = null;
+            }, 1000);
         }
     }
     lastTap = currentTime;
@@ -783,6 +832,9 @@ function clearAllTimeouts() {
         clearTimeout(shadowWaitTimeout);
         shadowWaitTimeout = null;
     }
+    if (typeof clearFlipTimeouts === 'function') {
+        clearFlipTimeouts();
+    }
 }
 
 function showIndicator() {
@@ -793,6 +845,38 @@ function hideIndicator() {
     cardIndicator.classList.remove('visible');
 }
 
+// Helper functions untuk efek
+function isCardVisible() {
+    return card.style.display !== 'none' && card.style.visibility === 'visible';
+}
+
+function hideCard() {
+    card.style.display = 'none';
+    card.style.visibility = 'hidden';
+    card.style.animation = 'none';
+    card.classList.remove('card-fadeout');
+}
+
+function applyBounds() {
+    const cardWidth = card.offsetWidth * scale;
+    const cardHeight = card.offsetHeight * scale;
+    
+    const minX = 0;
+    const maxX = window.innerWidth - cardWidth;
+    const minY = 0;
+    const maxY = window.innerHeight - cardHeight;
+    
+    posX = Math.max(minX, Math.min(maxX, posX));
+    posY = Math.max(minY, Math.min(maxY, posY));
+}
+
+function updateCardTransform() {
+    posX = Math.round(posX);
+    posY = Math.round(posY);
+    card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+}
+
+// Drag handlers
 card.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
         isDragging = true;
@@ -986,6 +1070,19 @@ card.addEventListener('touchend', (e) => {
                 scheduleExitSkating();
             }
         }
+        else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+            if (sequenceStage < activeCount) {
+                touchToChangeTimeout = setTimeout(() => {
+                    if (isSequenceActive) {
+                        flipToNextImage();
+                    }
+                    touchToChangeTimeout = null;
+                }, 3000);
+            } else {
+                isSequenceActive = false;
+                sequenceStage = 0;
+            }
+        }
     }, 50);
 });
 
@@ -1078,32 +1175,6 @@ function startSensorAnimation() {
         requestAnimationFrame(animate);
     }
     animate();
-}
-
-function applyBounds() {
-    const cardWidth = card.offsetWidth * scale;
-    const cardHeight = card.offsetHeight * scale;
-    
-    const minX = 0;
-    const maxX = window.innerWidth - cardWidth;
-    const minY = 0;
-    const maxY = window.innerHeight - cardHeight;
-    
-    posX = Math.max(minX, Math.min(maxX, posX));
-    posY = Math.max(minY, Math.min(maxY, posY));
-}
-
-function updateCardTransform() {
-    posX = Math.round(posX);
-    posY = Math.round(posY);
-    card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-}
-
-function hideCard() {
-    card.style.display = 'none';
-    card.style.visibility = 'hidden';
-    card.style.animation = 'none';
-    card.classList.remove('card-fadeout');
 }
 
 window.addEventListener('resize', () => {
