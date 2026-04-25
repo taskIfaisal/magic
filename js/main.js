@@ -10,6 +10,7 @@
     const cardSizeSlider = document.getElementById('card-size-slider');
     const sizeValue = document.getElementById('size-value');
     const mainCardPreview = document.getElementById('main-card-preview');
+    const cardIndicator = document.getElementById('card-indicator');
     
     // Preview elements
     const preview1 = document.getElementById('preview-1');
@@ -28,12 +29,90 @@
     let activeImages = { 1: true, 2: true, 3: true, 4: true };
     let isDragging = false;
     let startX, startY;
+    let velocityX = 0, velocityY = 0;
+    let lastPosX = 0, lastPosY = 0;
+    let lastTime = 0;
     let lastTap = 0;
+    let posX = window.innerWidth / 2 - 100;
+    let posY = window.innerHeight + 200;
+    let scale = 1;
+    let isAnimatingMotion = false;
     
     // Make global for other modules
     window.activeImages = activeImages;
     window.isDragging = false;
     window.autoSave = function() { Storage.save(getSaveData()); };
+    
+    // Card transform functions
+    function updateCardTransform() {
+        if (!card) return;
+        posX = Math.round(posX);
+        posY = Math.round(posY);
+        card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }
+    
+    function applyBounds() {
+        const cardWidth = card.offsetWidth * scale;
+        const cardHeight = card.offsetHeight * scale;
+        
+        const minX = 0;
+        const maxX = window.innerWidth - cardWidth;
+        const minY = 0;
+        const maxY = window.innerHeight - cardHeight;
+        
+        posX = Math.max(minX, Math.min(maxX, posX));
+        posY = Math.max(minY, Math.min(maxY, posY));
+    }
+    
+    function hideCard() {
+        card.style.display = 'none';
+        card.style.visibility = 'hidden';
+        card.style.animation = 'none';
+        card.classList.remove('card-fadeout');
+    }
+    
+    function showCard() {
+        card.style.display = 'block';
+        card.style.visibility = 'visible';
+        card.style.opacity = '1';
+    }
+    
+    function setCardPosition(x, y) {
+        posX = x;
+        posY = y;
+        updateCardTransform();
+    }
+    
+    function setCardCenter() {
+        const cardWidth = card.offsetWidth;
+        const cardHeight = card.offsetHeight;
+        posX = (window.innerWidth - cardWidth) / 2;
+        posY = (window.innerHeight - cardHeight) / 2;
+        updateCardTransform();
+    }
+    
+    function getCardPosition() {
+        return { x: posX, y: posY };
+    }
+    
+    function isCardVisible() {
+        return card.style.display !== 'none' && card.style.visibility === 'visible';
+    }
+    
+    function getActiveImagesList() {
+        const list = [];
+        const preview1Img = preview1.querySelector('img');
+        const preview2Img = preview2.querySelector('img');
+        const preview3Img = preview3.querySelector('img');
+        const preview4Img = preview4.querySelector('img');
+        
+        if (activeImages[1] && preview1Img && preview1Img.src) list.push({ index: 1, src: preview1Img.src });
+        if (activeImages[2] && preview2Img && preview2Img.src) list.push({ index: 2, src: preview2Img.src });
+        if (activeImages[3] && preview3Img && preview3Img.src) list.push({ index: 3, src: preview3Img.src });
+        if (activeImages[4] && preview4Img && preview4Img.src) list.push({ index: 4, src: preview4Img.src });
+        
+        return list;
+    }
     
     function getSaveData() {
         const preview1Img = preview1.querySelector('img');
@@ -134,44 +213,484 @@
         card.src = imageSrc;
         if (mainCardPreview) mainCardPreview.src = imageSrc;
         autoSave();
-        BackgroundRemover.updateDownloadButtonState();
+        if (BackgroundRemover && BackgroundRemover.updateDownloadButtonState) {
+            BackgroundRemover.updateDownloadButtonState();
+        }
+    }
+    
+    // ========== EFFECT TRIGGERS ==========
+    let sequenceTimer = null;
+    let touchToChangeTimeout = null;
+    let indicatorTimeout = null;
+    let cardAppearTimeout = null;
+    let exitIndicatorTimeout = null;
+    let exitCardTimeout = null;
+    let shadowFadeOutTimeout = null;
+    let shadowWaitTimeout = null;
+    let activeImagesList = [];
+    let currentCardImageIndex = 0;
+    let isSequenceActive = false;
+    let sequenceStage = 0;
+    let isAnimating = false;
+    
+    function clearAllTimeouts() {
+        if (sequenceTimer) { clearTimeout(sequenceTimer); sequenceTimer = null; }
+        if (touchToChangeTimeout) { clearTimeout(touchToChangeTimeout); touchToChangeTimeout = null; }
+        if (indicatorTimeout) { clearTimeout(indicatorTimeout); indicatorTimeout = null; }
+        if (cardAppearTimeout) { clearTimeout(cardAppearTimeout); cardAppearTimeout = null; }
+        if (exitIndicatorTimeout) { clearTimeout(exitIndicatorTimeout); exitIndicatorTimeout = null; }
+        if (exitCardTimeout) { clearTimeout(exitCardTimeout); exitCardTimeout = null; }
+        if (shadowFadeOutTimeout) { clearTimeout(shadowFadeOutTimeout); shadowFadeOutTimeout = null; }
+        if (shadowWaitTimeout) { clearTimeout(shadowWaitTimeout); shadowWaitTimeout = null; }
+    }
+    
+    function showIndicator() {
+        if (cardIndicator) cardIndicator.classList.add('visible');
+    }
+    
+    function hideIndicator() {
+        if (cardIndicator) cardIndicator.classList.remove('visible');
+    }
+    
+    // Effect Standar
+    function showCardStandar() {
+        const activeList = getActiveImagesList();
+        if (activeList.length === 0) return;
+        
+        card.style.transition = 'none';
+        card.style.transform = 'none';
+        card.style.left = '0';
+        card.style.top = '0';
+        card.style.display = 'block';
+        card.style.animation = 'none';
+        card.classList.remove('card-fadeout');
+        
+        const cardWidth = card.offsetWidth;
+        const cardHeight = card.offsetHeight;
+        
+        const centerX = (window.innerWidth - cardWidth) / 2;
+        const centerY = (window.innerHeight - cardHeight) / 2;
+        
+        setCardPosition(centerX, centerY);
+        currentCardImageIndex = 0;
+        card.src = activeList[0].src;
+        
+        card.style.opacity = '1';
+        card.style.visibility = 'visible';
+        updateCardTransform();
+        
+        activeImagesList = activeList;
+        isSequenceActive = true;
+        sequenceStage = 1;
+    }
+    
+    // Effect Shadow
+    function showCardShadow() {
+        const activeList = getActiveImagesList();
+        if (activeList.length === 0) return;
+        
+        if (shadowFadeOutTimeout) clearTimeout(shadowFadeOutTimeout);
+        if (shadowWaitTimeout) clearTimeout(shadowWaitTimeout);
+        
+        card.style.animation = 'none';
+        card.style.opacity = '1';
+        card.style.visibility = 'visible';
+        card.style.display = 'block';
+        card.style.transition = 'none';
+        card.style.transform = 'none';
+        card.style.left = '0';
+        card.style.top = '0';
+        card.classList.remove('card-fadeout');
+        
+        const cardWidth = card.offsetWidth;
+        const cardHeight = card.offsetHeight;
+        
+        const centerX = (window.innerWidth - cardWidth) / 2;
+        const centerY = (window.innerHeight - cardHeight) / 2;
+        
+        setCardPosition(centerX, centerY);
+        currentCardImageIndex = 0;
+        card.src = activeList[0].src;
+        
+        updateCardTransform();
+        void card.offsetHeight;
+        card.style.animation = 'muncul 5s ease-in-out';
+        
+        activeImagesList = activeList;
+        isSequenceActive = true;
+        sequenceStage = 1;
+    }
+    
+    function fadeOutShadowCard() {
+        if (!isSequenceActive || card.style.display === 'none') return;
+        
+        if (shadowWaitTimeout) clearTimeout(shadowWaitTimeout);
+        if (shadowFadeOutTimeout) clearTimeout(shadowFadeOutTimeout);
+        
+        shadowWaitTimeout = setTimeout(() => {
+            if (!isSequenceActive || card.style.display === 'none') return;
+            
+            card.style.animation = 'none';
+            void card.offsetHeight;
+            card.classList.add('card-fadeout');
+            
+            shadowFadeOutTimeout = setTimeout(() => {
+                if (isSequenceActive) {
+                    hideCard();
+                    card.classList.remove('card-fadeout');
+                    isSequenceActive = false;
+                    sequenceStage = 0;
+                }
+                shadowFadeOutTimeout = null;
+            }, 5000);
+            
+            shadowWaitTimeout = null;
+        }, 3000);
+    }
+    
+    function goToNextImageShadow() {
+        if (!isSequenceActive || activeImagesList.length === 0) return false;
+        
+        currentCardImageIndex++;
+        
+        if (currentCardImageIndex < activeImagesList.length) {
+            card.src = activeImagesList[currentCardImageIndex].src;
+            sequenceStage = currentCardImageIndex + 1;
+            return true;
+        }
+        return false;
+    }
+    
+    // Effect Slider
+    function showCardSlider() {
+        const activeList = getActiveImagesList();
+        if (activeList.length === 0) return;
+        
+        if (isAnimating) return;
+        isAnimating = true;
+        
+        clearAllTimeouts();
+        
+        currentCardImageIndex = 0;
+        card.src = activeList[0].src;
+        
+        card.style.animation = 'none';
+        card.style.opacity = '0';
+        card.style.visibility = 'hidden';
+        card.style.display = 'block';
+        card.classList.remove('card-fadeout');
+        card.style.left = '0';
+        card.style.top = '0';
+        card.style.right = 'auto';
+        card.style.bottom = 'auto';
+        card.style.margin = '0';
+        
+        card.classList.remove('card-moving', 'card-flipping', 'card-visible');
+        
+        requestAnimationFrame(() => {
+            if (card.complete) {
+                initCardAnimation();
+            } else {
+                card.onload = initCardAnimation;
+                setTimeout(initCardAnimation, 500);
+            }
+        });
+        
+        function initCardAnimation() {
+            isAnimatingMotion = true;
+            
+            const cardWidth = card.offsetWidth;
+            const cardHeight = card.offsetHeight;
+            
+            const startX = (window.innerWidth / 2) - (cardWidth / 2);
+            const startY = window.innerHeight + 100;
+            
+            setCardPosition(startX, startY);
+            
+            card.style.transition = 'none';
+            updateCardTransform();
+            
+            void card.offsetHeight;
+            
+            card.style.opacity = '1';
+            card.style.visibility = 'visible';
+            card.classList.add('card-visible');
+            
+            requestAnimationFrame(() => {
+                card.classList.add('card-moving');
+                card.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
+                
+                setTimeout(() => {
+                    const targetX = (window.innerWidth / 2) - (cardWidth / 2);
+                    const targetY = (window.innerHeight / 2) - (cardHeight / 2);
+                    
+                    setCardPosition(targetX, targetY);
+                    updateCardTransform();
+                    
+                    setTimeout(() => {
+                        isAnimating = false;
+                        isAnimatingMotion = false;
+                        card.classList.remove('card-moving');
+                        
+                        activeImagesList = activeList;
+                        isSequenceActive = true;
+                        sequenceStage = 1;
+                    }, 800);
+                }, 50);
+            });
+        }
+    }
+    
+    // Effect Skating
+    function showCardSkating() {
+        const activeList = getActiveImagesList();
+        if (activeList.length === 0) return;
+        
+        if (isAnimating) return;
+        isAnimating = true;
+        
+        clearAllTimeouts();
+        
+        currentCardImageIndex = 0;
+        card.src = activeList[0].src;
+        
+        card.style.animation = 'none';
+        card.style.opacity = '0';
+        card.style.visibility = 'hidden';
+        card.style.display = 'block';
+        card.classList.remove('card-fadeout');
+        card.style.left = '0';
+        card.style.top = '0';
+        card.style.right = 'auto';
+        card.style.bottom = 'auto';
+        card.style.margin = '0';
+        
+        card.classList.remove('card-moving', 'card-flipping', 'card-visible');
+        
+        requestAnimationFrame(() => {
+            if (card.complete) {
+                initCardAnimation();
+            } else {
+                card.onload = initCardAnimation;
+                setTimeout(initCardAnimation, 500);
+            }
+        });
+        
+        function initCardAnimation() {
+            isAnimatingMotion = true;
+            
+            const cardWidth = card.offsetWidth;
+            const cardHeight = card.offsetHeight;
+            
+            const startX = (window.innerWidth / 2) - (cardWidth / 2);
+            const startY = window.innerHeight + 100;
+            
+            setCardPosition(startX, startY);
+            
+            card.style.transition = 'none';
+            updateCardTransform();
+            
+            void card.offsetHeight;
+            
+            card.style.opacity = '1';
+            card.style.visibility = 'visible';
+            card.classList.add('card-visible');
+            
+            requestAnimationFrame(() => {
+                card.classList.add('card-moving');
+                card.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
+                
+                setTimeout(() => {
+                    const targetX = (window.innerWidth / 2) - (cardWidth / 2);
+                    const targetY = (window.innerHeight / 2) - (cardHeight / 2);
+                    
+                    setCardPosition(targetX, targetY);
+                    updateCardTransform();
+                    
+                    setTimeout(() => {
+                        isAnimating = false;
+                        isAnimatingMotion = false;
+                        card.classList.remove('card-moving');
+                        
+                        activeImagesList = activeList;
+                        isSequenceActive = true;
+                        sequenceStage = 1;
+                    }, 800);
+                }, 50);
+            });
+        }
+    }
+    
+    function scheduleExitSkating() {
+        if (card.style.display === 'none' || !isSequenceActive) return;
+        
+        if (exitIndicatorTimeout) clearTimeout(exitIndicatorTimeout);
+        if (exitCardTimeout) clearTimeout(exitCardTimeout);
+        
+        exitIndicatorTimeout = setTimeout(() => {
+            if (isSequenceActive) showIndicator();
+            exitIndicatorTimeout = null;
+        }, 3000);
+        
+        exitCardTimeout = setTimeout(() => {
+            if (isSequenceActive) {
+                hideIndicator();
+                exitCardSkating();
+            }
+            exitCardTimeout = null;
+        }, 4000);
+    }
+    
+    function exitCardSkating() {
+        if (card.style.display === 'none' || !isSequenceActive) return;
+        
+        isAnimatingMotion = true;
+        
+        card.classList.add('card-moving');
+        card.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
+        
+        const targetY = -card.offsetHeight - 100;
+        setCardPosition(posX, targetY);
+        updateCardTransform();
+        
+        setTimeout(() => {
+            hideCard();
+            card.classList.remove('card-moving');
+            isSequenceActive = false;
+            sequenceStage = 0;
+            isAnimatingMotion = false;
+        }, 500);
+    }
+    
+    function goToNextImage() {
+        if (!isSequenceActive || activeImagesList.length === 0) return false;
+        
+        currentCardImageIndex++;
+        
+        if (currentCardImageIndex < activeImagesList.length) {
+            card.src = activeImagesList[currentCardImageIndex].src;
+            sequenceStage = currentCardImageIndex + 1;
+            return true;
+        }
+        return false;
     }
     
     function triggerDoubleTapEffect() {
-        if (effectStandarCheckbox && effectStandarCheckbox.checked) {
-            StandarEffect.clearAllTimeouts();
-            StandarEffect.trigger();
-        } else if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
-            ShadowEffect.clearAllTimeouts();
-            ShadowEffect.trigger();
+        clearAllTimeouts();
+        hideIndicator();
+        
+        if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
+            isSequenceActive = true;
+            sequenceStage = 1;
+            
+            sequenceTimer = setTimeout(() => {
+                if (isSequenceActive) {
+                    showCardShadow();
+                }
+                sequenceTimer = null;
+            }, 5000);
+            
+        } else if (effectStandarCheckbox && effectStandarCheckbox.checked) {
+            isSequenceActive = false;
+            
+            sequenceTimer = setTimeout(() => {
+                showCardStandar();
+                sequenceTimer = null;
+            }, 1000);
+            
         } else if (effectSliderCheckbox && effectSliderCheckbox.checked) {
-            SliderEffect.clearAllTimeouts();
-            SliderEffect.trigger();
+            const totalDelay = 4000;
+            const indicatorDelay = 3000;
+            
+            indicatorTimeout = setTimeout(() => {
+                showIndicator();
+            }, indicatorDelay);
+            
+            cardAppearTimeout = setTimeout(() => {
+                hideIndicator();
+                showCardSlider();
+            }, totalDelay);
+            
         } else if (effectSkatingCheckbox && effectSkatingCheckbox.checked) {
-            SkatingEffect.clearAllTimeouts();
-            SkatingEffect.trigger();
+            const totalDelay = 4000;
+            const indicatorDelay = 3000;
+            
+            indicatorTimeout = setTimeout(() => {
+                showIndicator();
+            }, indicatorDelay);
+            
+            cardAppearTimeout = setTimeout(() => {
+                hideIndicator();
+                showCardSkating();
+            }, totalDelay);
         }
     }
     
     function handleCardTap() {
-        if (effectStandarCheckbox && effectStandarCheckbox.checked) {
-            StandarEffect.handleCardTap();
-        } else if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
-            ShadowEffect.handleCardTap();
-        } else if (effectSliderCheckbox && effectSliderCheckbox.checked) {
-            SliderEffect.handleCardTap();
-        } else if (effectSkatingCheckbox && effectSkatingCheckbox.checked) {
-            SkatingEffect.handleCardTap();
+        if (!isSequenceActive || !isCardVisible()) return;
+        
+        if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
+        
+        const activeCount = activeImagesList.length;
+        
+        if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
+            if (sequenceStage < activeCount) {
+                touchToChangeTimeout = setTimeout(() => {
+                    if (isSequenceActive) {
+                        goToNextImageShadow();
+                    }
+                    touchToChangeTimeout = null;
+                }, 3000);
+            } 
+            else if (sequenceStage === activeCount && activeCount > 0) {
+                if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
+                fadeOutShadowCard();
+            }
+        } 
+        else if ((effectStandarCheckbox && effectStandarCheckbox.checked) || 
+                 (effectSliderCheckbox && effectSliderCheckbox.checked)) {
+            if (sequenceStage < activeCount) {
+                touchToChangeTimeout = setTimeout(() => {
+                    if (isSequenceActive) {
+                        if (!goToNextImage()) {
+                            isSequenceActive = false;
+                            sequenceStage = 0;
+                        }
+                    }
+                    touchToChangeTimeout = null;
+                }, 3000);
+            } else {
+                isSequenceActive = false;
+                sequenceStage = 0;
+            }
+        }
+        else if (effectSkatingCheckbox && effectSkatingCheckbox.checked) {
+            if (sequenceStage < activeCount) {
+                touchToChangeTimeout = setTimeout(() => {
+                    if (isSequenceActive) {
+                        goToNextImage();
+                    }
+                    touchToChangeTimeout = null;
+                }, 3000);
+            } 
+            else if (sequenceStage === activeCount && activeCount > 0) {
+                scheduleExitSkating();
+            }
         }
     }
     
-    // Drag handlers
+    // ========== DRAG HANDLERS with Velocity Detection ==========
     function onTouchStart(e) {
         if (e.touches.length === 1) {
             isDragging = true;
             window.isDragging = true;
-            startX = e.touches[0].clientX - CardManager.getCardPosition().x;
-            startY = e.touches[0].clientY - CardManager.getCardPosition().y;
+            startX = e.touches[0].clientX - posX;
+            startY = e.touches[0].clientY - posY;
+            velocityX = 0;
+            velocityY = 0;
+            lastPosX = posX;
+            lastPosY = posY;
+            lastTime = Date.now();
             card.style.transition = 'none';
             card.style.animation = 'none';
             e.preventDefault();
@@ -180,21 +699,102 @@
     
     function onTouchMove(e) {
         if (isDragging && e.touches.length === 1) {
-            const newPosX = e.touches[0].clientX - startX;
-            const newPosY = e.touches[0].clientY - startY;
-            CardManager.setCardPosition(newPosX, newPosY);
-            CardManager.updateCardTransform();
+            const now = Date.now();
+            const deltaTime = now - lastTime;
+            
+            if (deltaTime > 0) {
+                const newPosX = e.touches[0].clientX - startX;
+                const newPosY = e.touches[0].clientY - startY;
+                
+                velocityX = (newPosX - lastPosX) / deltaTime * 1000;
+                velocityY = (newPosY - lastPosY) / deltaTime * 1000;
+                
+                lastPosX = newPosX;
+                lastPosY = newPosY;
+                lastTime = now;
+                
+                setCardPosition(newPosX, newPosY);
+                updateCardTransform();
+                
+                // Check if card is thrown out of screen
+                const cardRect = card.getBoundingClientRect();
+                
+                if (cardRect.bottom < -10 || 
+                    cardRect.top > window.innerHeight + 10 ||
+                    cardRect.right < -10 || 
+                    cardRect.left > window.innerWidth + 10) {
+                    
+                    hideCard();
+                    isSequenceActive = false;
+                    sequenceStage = 0;
+                    isDragging = false;
+                    window.isDragging = false;
+                    
+                    if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
+                    if (shadowFadeOutTimeout) clearTimeout(shadowFadeOutTimeout);
+                    if (shadowWaitTimeout) clearTimeout(shadowWaitTimeout);
+                    card.classList.remove('card-fadeout');
+                    card.style.animation = 'none';
+                    
+                    e.preventDefault();
+                    return;
+                }
+            }
             e.preventDefault();
         }
     }
     
     function onTouchEnd(e) {
         if (isDragging) {
+            const cardRect = card.getBoundingClientRect();
+            
+            // Check if card is out of screen
+            if (cardRect.bottom < -10 || 
+                cardRect.top > window.innerHeight + 10 ||
+                cardRect.right < -10 || 
+                cardRect.left > window.innerWidth + 10) {
+                
+                hideCard();
+                isSequenceActive = false;
+                sequenceStage = 0;
+                
+                if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
+                if (shadowFadeOutTimeout) clearTimeout(shadowFadeOutTimeout);
+                if (shadowWaitTimeout) clearTimeout(shadowWaitTimeout);
+                card.classList.remove('card-fadeout');
+                card.style.animation = 'none';
+                
+                isDragging = false;
+                window.isDragging = false;
+                return;
+            }
+            
+            // Check velocity threshold
+            const speedThreshold = 800;
+            const currentSpeed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+            
+            if (currentSpeed > speedThreshold) {
+                hideCard();
+                isSequenceActive = false;
+                sequenceStage = 0;
+                
+                if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
+                if (shadowFadeOutTimeout) clearTimeout(shadowFadeOutTimeout);
+                if (shadowWaitTimeout) clearTimeout(shadowWaitTimeout);
+                card.classList.remove('card-fadeout');
+                card.style.animation = 'none';
+                
+                isDragging = false;
+                window.isDragging = false;
+                return;
+            }
+            
             isDragging = false;
             window.isDragging = false;
-            CardManager.applyBounds();
-            CardManager.updateCardTransform();
             card.style.transition = '';
+            
+            applyBounds();
+            updateCardTransform();
         }
         
         // Double tap detection
@@ -207,53 +807,87 @@
         }
         lastTap = currentTime;
         
-        // Handle single tap on card for image change
-        if (CardManager.isCardVisible()) {
-            handleCardTap();
+        // Handle single tap on card for image change (with delay)
+        setTimeout(() => {
+            if (isCardVisible()) {
+                handleCardTap();
+            }
+        }, 50);
+    }
+    
+    // ========== SENSOR HANDLER ==========
+    let smoothBeta = 0;
+    let smoothGamma = 0;
+    const sensitivity = 0.5;
+    const smoothing = 0.2;
+    let isSensorEnabled = false;
+    let sensorAnimationId = null;
+    const sensorPermissionBtn = document.getElementById('sensor-permission');
+    
+    function startSensorAnimation() {
+        function animate() {
+            if (isSensorEnabled && !isDragging && !isAnimatingMotion && 
+                sensorGerakCheckbox && sensorGerakCheckbox.checked && 
+                isCardVisible()) {
+                posX += smoothGamma * sensitivity;
+                posY += smoothBeta * sensitivity;
+                applyBounds();
+                updateCardTransform();
+            }
+            sensorAnimationId = requestAnimationFrame(animate);
+        }
+        animate();
+    }
+    
+    function handleDeviceOrientation(e) {
+        const beta = e.beta || 0;
+        const gamma = e.gamma || 0;
+        
+        const limitedBeta = Math.max(-45, Math.min(45, beta));
+        const limitedGamma = Math.max(-45, Math.min(45, gamma));
+        
+        smoothBeta += (limitedBeta - smoothBeta) * smoothing;
+        smoothGamma += (limitedGamma - smoothGamma) * smoothing;
+    }
+    
+    function initSensor() {
+        if (typeof DeviceOrientationEvent !== 'undefined' && 
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+            if (sensorPermissionBtn) {
+                sensorPermissionBtn.classList.remove('hidden');
+                sensorPermissionBtn.onclick = async () => {
+                    try {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === "granted") {
+                            sensorPermissionBtn.classList.add('hidden');
+                            isSensorEnabled = true;
+                            window.addEventListener("deviceorientation", handleDeviceOrientation);
+                            startSensorAnimation();
+                        }
+                    } catch (error) {
+                        console.error("Error requesting permission:", error);
+                        if (sensorPermissionBtn) {
+                            sensorPermissionBtn.innerHTML = "Error requesting permission.<br>Try refreshing the page.";
+                        }
+                    }
+                };
+            }
+        } else {
+            if (sensorPermissionBtn) sensorPermissionBtn.classList.add('hidden');
+            isSensorEnabled = true;
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener("deviceorientation", handleDeviceOrientation);
+                startSensorAnimation();
+            }
         }
     }
     
+    // ========== EVENT LISTENERS ==========
     function initEventListeners() {
-        // Card drag
+        // Card drag with velocity detection
         card.addEventListener('touchstart', onTouchStart, { passive: false });
         document.addEventListener('touchmove', onTouchMove, { passive: false });
         card.addEventListener('touchend', onTouchEnd);
-        
-        // Settings
-        if (bgUpload) {
-            bgUpload.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        background.style.backgroundImage = `url(${event.target.result})`;
-                        autoSave();
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
-        
-        if (cardUpload) {
-            cardUpload.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        updateCardImage(event.target.result);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
-        
-        if (closeSettingsBtn) {
-            closeSettingsBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                settings.style.top = '-100%';
-                autoSave();
-            });
-        }
         
         // Two finger swipe to open settings
         let startYPos = 0;
@@ -272,6 +906,44 @@
             }
         });
         
+        // Background upload
+        if (bgUpload) {
+            bgUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        background.style.backgroundImage = `url(${event.target.result})`;
+                        autoSave();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        // Card upload
+        if (cardUpload) {
+            cardUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        updateCardImage(event.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        // Close settings
+        if (closeSettingsBtn) {
+            closeSettingsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                settings.style.top = '-100%';
+                autoSave();
+            });
+        }
+        
         // Card size slider
         if (cardSizeSlider) {
             cardSizeSlider.addEventListener('input', (e) => {
@@ -280,14 +952,13 @@
                 card.style.maxWidth = newSize + 'px';
                 Storage.saveCardSize(newSize);
                 updatePreviewCardSize();
-                if (CardManager.isCardVisible()) {
+                if (isCardVisible()) {
                     const oldWidth = card.offsetWidth;
                     setTimeout(() => {
                         const newWidth = card.offsetWidth;
-                        const pos = CardManager.getCardPosition();
-                        CardManager.setCardPosition(pos.x - (newWidth - oldWidth) / 2, pos.y);
-                        CardManager.applyBounds();
-                        CardManager.updateCardTransform();
+                        posX = posX - (newWidth - oldWidth) / 2;
+                        applyBounds();
+                        updateCardTransform();
                     }, 10);
                 }
                 autoSave();
@@ -335,30 +1006,38 @@
             autoSave();
         });
         
-        // Preview click handlers
-        preview1.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('preview-toggle')) {
-                GithubPicker.showModal(1);
-            }
-        });
+        // Preview click handlers for GitHub picker
+        if (preview1) {
+            preview1.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('preview-toggle')) {
+                    if (GithubPicker && GithubPicker.showModal) GithubPicker.showModal(1);
+                }
+            });
+        }
         
-        preview2.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('preview-toggle')) {
-                GithubPicker.showModal(2);
-            }
-        });
+        if (preview2) {
+            preview2.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('preview-toggle')) {
+                    if (GithubPicker && GithubPicker.showModal) GithubPicker.showModal(2);
+                }
+            });
+        }
         
-        preview3.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('preview-toggle')) {
-                GithubPicker.showModal(3);
-            }
-        });
+        if (preview3) {
+            preview3.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('preview-toggle')) {
+                    if (GithubPicker && GithubPicker.showModal) GithubPicker.showModal(3);
+                }
+            });
+        }
         
-        preview4.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('preview-toggle')) {
-                GithubPicker.showModal(4);
-            }
-        });
+        if (preview4) {
+            preview4.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('preview-toggle')) {
+                    if (GithubPicker && GithubPicker.showModal) GithubPicker.showModal(4);
+                }
+            });
+        }
         
         // Preview toggle buttons
         document.querySelectorAll('.preview-toggle').forEach(toggle => {
@@ -373,7 +1052,7 @@
             });
         });
         
-        // Keyboard handler
+        // Keyboard handler (1 = tap, 2 = double tap)
         document.addEventListener('keydown', (event) => {
             if (event.key === '1' || event.key === '2') {
                 event.preventDefault();
@@ -388,17 +1067,22 @@
     
     function init() {
         loadFromStorage();
-        CardManager.setCardPosition(window.innerWidth / 2 - 100, window.innerHeight + 200);
-        CardManager.hideCard();
+        
+        // Initialize card position (hidden offscreen)
+        posX = window.innerWidth / 2 - 100;
+        posY = window.innerHeight + 200;
+        hideCard();
+        updateCardTransform();
         
         initEventListeners();
-        Sensor.init();
-        BackgroundRemover.init();
+        initSensor();
+        
+        if (BackgroundRemover && BackgroundRemover.init) BackgroundRemover.init();
         
         window.addEventListener('resize', () => {
-            if (CardManager.isCardVisible()) {
-                CardManager.setCardCenter();
-                CardManager.updateCardTransform();
+            if (isCardVisible()) {
+                setCardCenter();
+                updateCardTransform();
             }
         });
         
@@ -406,11 +1090,12 @@
             autoSave();
         });
         
-        // Initialize previews
         setTimeout(() => {
             updatePreviewCardSize();
             updateActivePreviewStyles();
-            BackgroundRemover.updateDownloadButtonState();
+            if (BackgroundRemover && BackgroundRemover.updateDownloadButtonState) {
+                BackgroundRemover.updateDownloadButtonState();
+            }
         }, 200);
     }
     
