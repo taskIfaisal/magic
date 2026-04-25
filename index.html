@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Magic Card Trick</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon/card2phone-512x512.png">
+    <link rel="apple-touch-startup-image" href="./icon/card2phone-512x512.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Card2Pro">
+    <link href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon/card2phone-512x512.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="background"></div>
+    <img id="card" src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Magic Ball">
+    
+    <div id="card-indicator"></div>
+    
+    <div id="settings">
+        <h2>Settings</h2>
+        
+        <div class="setting-section">
+            <h3>Background Image</h3>
+            <label class="file-upload">
+                Choose Background
+                <input type="file" id="bg-upload" accept="image/*">
+            </label>
+        </div>
+        
+        <div class="setting-section">
+            <h3>Card Image</h3>
+            <label class="file-upload">
+                Choose Card
+                <input type="file" id="card-upload" accept="image/*">
+            </label>
+        </div>
+
+        <div class="setting-section">
+            <h3>Quick Preview (4 Favorites)</h3>
+            <div class="preview-grid">
+                <div class="preview-item">
+                    <div class="preview-box" id="preview-1" data-index="1">
+                        <img src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Preview 1">
+                        <div class="preview-toggle active" data-toggle="1"></div>
+                    </div>
+                    <span class="preview-label-small">Favorite 1</span>
+                </div>
+                
+                <div class="preview-item">
+                    <div class="preview-box" id="preview-2" data-index="2">
+                        <img src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Preview 2">
+                        <div class="preview-toggle active" data-toggle="2"></div>
+                    </div>
+                    <span class="preview-label-small">Favorite 2</span>
+                </div>
+                
+                <div class="preview-item">
+                    <div class="preview-box" id="preview-3" data-index="3">
+                        <img src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Preview 3">
+                        <div class="preview-toggle active" data-toggle="3"></div>
+                    </div>
+                    <span class="preview-label-small">Favorite 3</span>
+                </div>
+
+                <div class="preview-item">
+                    <div class="preview-box" id="preview-4" data-index="4">
+                        <img src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Preview 4">
+                        <div class="preview-toggle active" data-toggle="4"></div>
+                    </div>
+                    <span class="preview-label-small">Favorite 4</span>
+                </div>
+            </div>
+            <p><small>✨ Klik gambar: buka album GitHub | Klik bulatan ✓/✕: aktif/nonaktifkan</small></p>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Effect Standar</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="effect-standar">
+                    <span class="toggle-slider effect-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Double tap → tunggu 1 detik → kartu muncul langsung di tengah (gambar aktif pertama)
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Effect Shadow</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="shadow-effect">
+                    <span class="toggle-slider effect-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Double tap → tunggu 5 detik → kartu muncul fade in 5 detik di tengah, berganti sesuai gambar aktif (3 detik setelah sentuh), setelah gambar terakhir tunggu 3 detik → fade out 5 detik
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Effect Slider</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="effect-slider">
+                    <span class="toggle-slider effect-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Double tap → tunggu 4 detik (indikator detik 3) → kartu slide dari bawah ke tengah (tetap di tengah setelah selesai)
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Effect Skating</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="effect-skating">
+                    <span class="toggle-slider effect-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Double tap → tunggu 4 detik (indikator detik 3) → kartu slide dari bawah ke tengah, berganti gambar, setelah selesai tunggu 4 detik (indikator detik 3) → slide keluar ke atas
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Sensor Gerak</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="sensor-gerak" checked>
+                    <span class="toggle-slider sensor-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Kartu bergerak mengikuti kemiringan device (gyroscope)
+            </div>
+        </div>
+
+        <div class="preview-frame-container">
+            <div class="preview-label">🔮 PREVIEW KARTU UTAMA</div>
+            <div class="editor-frame">
+                <img id="main-card-preview" src="https://raw.githubusercontent.com/taskIfaisal/sw/main/icon/Basketball.png" alt="Main Card Preview">
+            </div>
+        </div>
+
+        <div class="setting-section" style="border-top: 1px solid #333; padding-top: 15px; margin-top: 10px;">
+            <p style="font-size: 12px; color: #4CAF50; text-align: center; margin: 0 0 10px 0; font-weight: 500;">
+                ⬆️ Proses & hasil akan tampil di preview atas (maks 5MB)
+            </p>
+            
+            <div class="button-row">
+                <button id="remove-bg-btn">
+                    🧹 Hapus Background
+                </button>
+                
+                <button id="download-result-btn">
+                    ⬇️ Unduh
+                </button>
+            </div>
+            
+            <div id="remove-bg-status" class="remove-bg-status" style="display: none;"></div>
+        </div>
+
+        <div class="setting-section">
+            <h3>Card Size</h3>
+            <div class="size-control">
+                <input type="range" id="card-size-slider" min="100" max="400" value="200" step="5">
+                <span id="size-value">200px</span>
+            </div>
+            <small>Adjust card size (100px - 400px)</small>
+        </div>
+        
+        <div class="setting-section">
+            <button id="close-settings" class="save-close-btn">Save & Close</button>
+        </div>
+    </div>
+    
+    <button id="sensor-permission" class="hidden">
+        Allow Motion Sensor Access<br>
+        <small>(Tap to enable tilt controls)</small>
+    </button>
+
+    <script src="js/config.js"></script>
+    <script src="js/modules/storage.js"></script>
+    <script src="js/modules/card-manager.js"></script>
+    <script src="js/modules/sensor.js"></script>
+    <script src="js/modules/github-picker.js"></script>
+    <script src="js/modules/background-remover.js"></script>
+    <script src="js/effects/base-effect.js"></script>
+    <script src="js/effects/standar-effect.js"></script>
+    <script src="js/effects/shadow-effect.js"></script>
+    <script src="js/effects/slider-effect.js"></script>
+    <script src="js/effects/skating-effect.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
