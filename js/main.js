@@ -1,7 +1,7 @@
 // ===== MAIN APPLICATION =====
 // Elements
 const background = document.getElementById('background');
-const card = document.getElementById('card');
+let card = document.getElementById('card');
 const settings = document.getElementById('settings');
 const bgUpload = document.getElementById('bg-upload');
 const cardUpload = document.getElementById('card-upload');
@@ -40,8 +40,8 @@ let activeImages = {
     1: true, 2: true, 3: true, 4: true
 };
 
-let posX = window.innerWidth / 2 - card.offsetWidth / 2;
-let posY = window.innerHeight + card.offsetHeight + 100;
+let posX = window.innerWidth / 2 - 100;
+let posY = window.innerHeight + 200;
 let scale = 1;
 let isDragging = false;
 let startX, startY;
@@ -206,25 +206,27 @@ function triggerCardTap() {
         }
     }
     else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
-        if (sequenceStage < activeCount) {
-            touchToChangeTimeout = setTimeout(() => {
-                if (isSequenceActive) {
-                    flipToNextImage();
-                }
-                touchToChangeTimeout = null;
-            }, 3000);
-        } else {
-            isSequenceActive = false;
-            sequenceStage = 0;
+        // Gunakan handler khusus untuk flip effect
+        if (typeof handleFlipCardTap === 'function') {
+            handleFlipCardTap();
         }
     }
 }
 
+// ===== DOUBLE TAP EFFECT HANDLER =====
 function triggerDoubleTapEffect() {
+    // Bersihkan semua timeout yang berjalan
     clearAllTimeouts();
     hideIndicator();
     
+    // Reset flip effect jika ada (untuk memastikan kartu kembali ke mode normal)
+    if (typeof resetFlipEffect === 'function') {
+        resetFlipEffect();
+    }
+    
+    // CEK EFEK SHADOW
     if (shadowEffectCheckbox.checked) {
+        console.log("Shadow effect triggered");
         isSequenceActive = true;
         sequenceStage = 1;
         
@@ -235,7 +237,10 @@ function triggerDoubleTapEffect() {
             sequenceTimer = null;
         }, 5000);
         
-    } else if (effectStandarCheckbox.checked) {
+    } 
+    // CEK EFEK STANDAR
+    else if (effectStandarCheckbox.checked) {
+        console.log("Standar effect triggered");
         isSequenceActive = false;
         
         sequenceTimer = setTimeout(() => {
@@ -243,7 +248,10 @@ function triggerDoubleTapEffect() {
             sequenceTimer = null;
         }, 1000);
         
-    } else if (effectSliderCheckbox.checked) {
+    } 
+    // CEK EFEK SLIDER
+    else if (effectSliderCheckbox.checked) {
+        console.log("Slider effect triggered");
         const totalDelay = 4000;
         const indicatorDelay = 3000;
         
@@ -256,7 +264,10 @@ function triggerDoubleTapEffect() {
             showCardSlider();
         }, totalDelay);
         
-    } else if (effectSkatingCheckbox.checked) {
+    } 
+    // CEK EFEK SKATING
+    else if (effectSkatingCheckbox.checked) {
+        console.log("Skating effect triggered");
         const totalDelay = 4000;
         const indicatorDelay = 3000;
         
@@ -269,7 +280,10 @@ function triggerDoubleTapEffect() {
             showCardSkating();
         }, totalDelay);
         
-    } else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+    } 
+    // CEK EFEK FLIP 3D
+    else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+        console.log("Flip 3D effect triggered");
         isSequenceActive = false;
         
         sequenceTimer = setTimeout(() => {
@@ -277,6 +291,77 @@ function triggerDoubleTapEffect() {
             sequenceTimer = null;
         }, 1000);
     }
+    
+    // Jika tidak ada efek yang dipilih, lakukan efek standar default
+    else {
+        console.log("No effect selected, using default (Standar)");
+        isSequenceActive = false;
+        
+        sequenceTimer = setTimeout(() => {
+            showCardStandar();
+            sequenceTimer = null;
+        }, 1000);
+    }
+}
+
+// ===== CLEAR ALL TIMEOUTS =====
+function clearAllTimeouts() {
+    // Timeout untuk sequence timer (double tap delay)
+    if (sequenceTimer) {
+        clearTimeout(sequenceTimer);
+        sequenceTimer = null;
+    }
+    
+    // Timeout untuk touch to change (pergantian gambar setelah tap)
+    if (touchToChangeTimeout) {
+        clearTimeout(touchToChangeTimeout);
+        touchToChangeTimeout = null;
+    }
+    
+    // Timeout untuk indicator (titik kecil di pojok)
+    if (indicatorTimeout) {
+        clearTimeout(indicatorTimeout);
+        indicatorTimeout = null;
+    }
+    
+    // Timeout untuk card appear (kemunculan kartu)
+    if (cardAppearTimeout) {
+        clearTimeout(cardAppearTimeout);
+        cardAppearTimeout = null;
+    }
+    
+    // Timeout untuk exit indicator (skating)
+    if (exitIndicatorTimeout) {
+        clearTimeout(exitIndicatorTimeout);
+        exitIndicatorTimeout = null;
+    }
+    
+    // Timeout untuk exit card (skating)
+    if (exitCardTimeout) {
+        clearTimeout(exitCardTimeout);
+        exitCardTimeout = null;
+    }
+    
+    // Timeout untuk shadow effect fade out
+    if (shadowFadeOutTimeout) {
+        clearTimeout(shadowFadeOutTimeout);
+        shadowFadeOutTimeout = null;
+    }
+    
+    // Timeout untuk shadow effect wait
+    if (shadowWaitTimeout) {
+        clearTimeout(shadowWaitTimeout);
+        shadowWaitTimeout = null;
+    }
+    
+    // Timeout untuk flip effect (animasi flip 3D)
+    if (typeof clearFlipTimeouts === 'function') {
+        clearFlipTimeouts();
+    }
+    
+    // Hentikan animasi yang sedang berjalan
+    isAnimating = false;
+    isAnimatingMotion = false;
 }
 
 // Keyboard event listener
@@ -739,9 +824,16 @@ document.addEventListener('touchend', (e) => {
     if (tapLength < 300 && tapLength > 0) {
         e.preventDefault();
         
+        // Bersihkan semua timeout sebelum menjalankan effect baru
         clearAllTimeouts();
         hideIndicator();
         
+        // Reset flip effect
+        if (typeof resetFlipEffect === 'function') {
+            resetFlipEffect();
+        }
+        
+        // CEK EFEK SHADOW
         if (shadowEffectCheckbox.checked) {
             isSequenceActive = true;
             sequenceStage = 1;
@@ -753,7 +845,9 @@ document.addEventListener('touchend', (e) => {
                 sequenceTimer = null;
             }, 5000);
             
-        } else if (effectStandarCheckbox.checked) {
+        } 
+        // CEK EFEK STANDAR
+        else if (effectStandarCheckbox.checked) {
             isSequenceActive = false;
             
             sequenceTimer = setTimeout(() => {
@@ -761,7 +855,9 @@ document.addEventListener('touchend', (e) => {
                 sequenceTimer = null;
             }, 1000);
             
-        } else if (effectSliderCheckbox.checked) {
+        } 
+        // CEK EFEK SLIDER
+        else if (effectSliderCheckbox.checked) {
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -774,7 +870,9 @@ document.addEventListener('touchend', (e) => {
                 showCardSlider();
             }, totalDelay);
             
-        } else if (effectSkatingCheckbox.checked) {
+        } 
+        // CEK EFEK SKATING
+        else if (effectSkatingCheckbox.checked) {
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -787,7 +885,9 @@ document.addEventListener('touchend', (e) => {
                 showCardSkating();
             }, totalDelay);
             
-        } else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
+        } 
+        // CEK EFEK FLIP 3D
+        else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
             isSequenceActive = false;
             
             sequenceTimer = setTimeout(() => {
@@ -799,81 +899,16 @@ document.addEventListener('touchend', (e) => {
     lastTap = currentTime;
 });
 
-function clearAllTimeouts() {
-    if (sequenceTimer) {
-        clearTimeout(sequenceTimer);
-        sequenceTimer = null;
-    }
-    if (touchToChangeTimeout) {
-        clearTimeout(touchToChangeTimeout);
-        touchToChangeTimeout = null;
-    }
-    if (indicatorTimeout) {
-        clearTimeout(indicatorTimeout);
-        indicatorTimeout = null;
-    }
-    if (cardAppearTimeout) {
-        clearTimeout(cardAppearTimeout);
-        cardAppearTimeout = null;
-    }
-    if (exitIndicatorTimeout) {
-        clearTimeout(exitIndicatorTimeout);
-        exitIndicatorTimeout = null;
-    }
-    if (exitCardTimeout) {
-        clearTimeout(exitCardTimeout);
-        exitCardTimeout = null;
-    }
-    if (shadowFadeOutTimeout) {
-        clearTimeout(shadowFadeOutTimeout);
-        shadowFadeOutTimeout = null;
-    }
-    if (shadowWaitTimeout) {
-        clearTimeout(shadowWaitTimeout);
-        shadowWaitTimeout = null;
-    }
-    if (typeof clearFlipTimeouts === 'function') {
-        clearFlipTimeouts();
-    }
-}
-
 function showIndicator() {
-    cardIndicator.classList.add('visible');
+    if (cardIndicator) {
+        cardIndicator.classList.add('visible');
+    }
 }
 
 function hideIndicator() {
-    cardIndicator.classList.remove('visible');
-}
-
-// Helper functions untuk efek
-function isCardVisible() {
-    return card.style.display !== 'none' && card.style.visibility === 'visible';
-}
-
-function hideCard() {
-    card.style.display = 'none';
-    card.style.visibility = 'hidden';
-    card.style.animation = 'none';
-    card.classList.remove('card-fadeout');
-}
-
-function applyBounds() {
-    const cardWidth = card.offsetWidth * scale;
-    const cardHeight = card.offsetHeight * scale;
-    
-    const minX = 0;
-    const maxX = window.innerWidth - cardWidth;
-    const minY = 0;
-    const maxY = window.innerHeight - cardHeight;
-    
-    posX = Math.max(minX, Math.min(maxX, posX));
-    posY = Math.max(minY, Math.min(maxY, posY));
-}
-
-function updateCardTransform() {
-    posX = Math.round(posX);
-    posY = Math.round(posY);
-    card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    if (cardIndicator) {
+        cardIndicator.classList.remove('visible');
+    }
 }
 
 // Drag handlers
@@ -1071,16 +1106,8 @@ card.addEventListener('touchend', (e) => {
             }
         }
         else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
-            if (sequenceStage < activeCount) {
-                touchToChangeTimeout = setTimeout(() => {
-                    if (isSequenceActive) {
-                        flipToNextImage();
-                    }
-                    touchToChangeTimeout = null;
-                }, 3000);
-            } else {
-                isSequenceActive = false;
-                sequenceStage = 0;
+            if (typeof handleFlipCardTap === 'function') {
+                handleFlipCardTap();
             }
         }
     }, 50);
@@ -1175,6 +1202,36 @@ function startSensorAnimation() {
         requestAnimationFrame(animate);
     }
     animate();
+}
+
+function applyBounds() {
+    const cardWidth = card.offsetWidth * scale;
+    const cardHeight = card.offsetHeight * scale;
+    
+    const minX = 0;
+    const maxX = window.innerWidth - cardWidth;
+    const minY = 0;
+    const maxY = window.innerHeight - cardHeight;
+    
+    posX = Math.max(minX, Math.min(maxX, posX));
+    posY = Math.max(minY, Math.min(maxY, posY));
+}
+
+function updateCardTransform() {
+    posX = Math.round(posX);
+    posY = Math.round(posY);
+    card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+}
+
+function hideCard() {
+    card.style.display = 'none';
+    card.style.visibility = 'hidden';
+    card.style.animation = 'none';
+    card.classList.remove('card-fadeout');
+}
+
+function isCardVisible() {
+    return card.style.display !== 'none' && card.style.visibility === 'visible';
 }
 
 window.addEventListener('resize', () => {
