@@ -32,8 +32,7 @@
     let velocityX = 0, velocityY = 0;
     let lastPosX = 0, lastPosY = 0;
     let lastTime = 0;
-    let lastTap = 0;
-    let lastTapTime = 0;
+    let lastTap = 0;  // INI PENTING - untuk double tap detection
     let posX = window.innerWidth / 2 - 100;
     let posY = window.innerHeight + 200;
     let scale = 1;
@@ -585,13 +584,12 @@
     }
     
     function triggerDoubleTapEffect() {
-        console.log("Double tap triggered!"); // For debugging
-        
+        console.log("Double tap triggered!");
         clearAllTimeouts();
         hideIndicator();
         
         if (shadowEffectCheckbox && shadowEffectCheckbox.checked) {
-            console.log("Shadow effect triggered");
+            console.log("Running Shadow effect");
             isSequenceActive = true;
             sequenceStage = 1;
             
@@ -603,7 +601,7 @@
             }, 5000);
             
         } else if (effectStandarCheckbox && effectStandarCheckbox.checked) {
-            console.log("Standar effect triggered");
+            console.log("Running Standar effect");
             isSequenceActive = false;
             
             sequenceTimer = setTimeout(() => {
@@ -612,7 +610,7 @@
             }, 1000);
             
         } else if (effectSliderCheckbox && effectSliderCheckbox.checked) {
-            console.log("Slider effect triggered");
+            console.log("Running Slider effect");
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -626,7 +624,7 @@
             }, totalDelay);
             
         } else if (effectSkatingCheckbox && effectSkatingCheckbox.checked) {
-            console.log("Skating effect triggered");
+            console.log("Running Skating effect");
             const totalDelay = 4000;
             const indicatorDelay = 3000;
             
@@ -638,13 +636,11 @@
                 hideIndicator();
                 showCardSkating();
             }, totalDelay);
-        } else {
-            console.log("No effect selected!");
         }
     }
     
     function handleCardTap() {
-        console.log("Single tap triggered, isSequenceActive:", isSequenceActive, "isCardVisible:", isCardVisible());
+        console.log("Single tap triggered");
         
         if (!isSequenceActive || !isCardVisible()) return;
         
@@ -763,6 +759,8 @@
         }
     }
     
+    // ========== INI YANG PALING PENTING - DOUBLE TAP DETECTION ==========
+    // SAMA PERSIS SEPERTI KODE ASLI ANDA
     function onTouchEnd(e) {
         // Handle drag end
         if (isDragging) {
@@ -817,34 +815,26 @@
             updateCardTransform();
         }
         
-        // ========== DOUBLE TAP DETECTION (CRITICAL FIX) ==========
+        // ========== DOUBLE TAP DETECTION - PERSIS SEPERTI KODE ASLI ==========
         const currentTime = new Date().getTime();
-        const tapGap = currentTime - lastTapTime;
+        const tapLength = currentTime - lastTap;
         
-        console.log("Tap detected, gap:", tapGap, "ms");
-        
-        // Double tap if gap is less than 300ms (not too short, not too long)
-        if (tapGap < 300 && tapGap > 10) {
-            console.log("DOUBLE TAP DETECTED!");
+        // KODE ASLI: if (tapLength < 300 && tapLength > 0)
+        if (tapLength < 300 && tapLength > 0) {
             e.preventDefault();
+            console.log("DOUBLE TAP DETECTED! Running effect...");
             triggerDoubleTapEffect();
-            lastTapTime = 0; // Reset to prevent triple tap detection
         } else {
-            // Single tap - handle after a short delay to confirm it's not a double tap
-            if (tapGap > 300 || lastTapTime === 0) {
-                setTimeout(() => {
-                    // Only trigger single tap if another tap didn't come within 300ms
-                    const now = new Date().getTime();
-                    const timeSinceLastTap = now - lastTapTime;
-                    if (timeSinceLastTap > 300 || timeSinceLastTap === 0) {
-                        console.log("SINGLE TAP DETECTED");
-                        handleCardTap();
-                    }
-                }, 50);
-            }
+            // Single tap with delay - sama seperti kode asli
+            setTimeout(() => {
+                if (isCardVisible()) {
+                    console.log("SINGLE TAP DETECTED!");
+                    handleCardTap();
+                }
+            }, 50);
         }
         
-        lastTapTime = currentTime;
+        lastTap = currentTime;
     }
     
     // ========== SENSOR HANDLER ==========
