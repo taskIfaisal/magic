@@ -130,6 +130,19 @@
 
         <div class="setting-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3 style="margin: 0;">Effect Flip 3D</h3>
+                <label class="toggle-switch" style="margin: 0;">
+                    <input type="checkbox" id="effect-flip">
+                    <span class="toggle-slider effect-slider"></span>
+                </label>
+            </div>
+            <div class="effect-description">
+                ON: Double tap → tunggu 1 detik → kartu muncul di tengah. Saat tap pada kartu, kartu akan flip 3D sebelum berganti gambar (delay 3 detik antar pergantian)
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                 <h3 style="margin: 0;">Sensor Gerak</h3>
                 <label class="toggle-switch" style="margin: 0;">
                     <input type="checkbox" id="sensor-gerak" checked>
@@ -189,6 +202,7 @@
     <script src="js/effects/shadow-effect.js"></script>
     <script src="js/effects/slider-effect.js"></script>
     <script src="js/effects/skating-effect.js"></script>
+    <script src="js/effects/flip-effect.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
