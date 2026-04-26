@@ -1,7 +1,9 @@
 // ===== FLIP 3D EFFECT =====
-// Menggunakan efek flip 3D dari contoh (front/back div terpisah)
-// Flip hanya untuk transisi gambar 1 → gambar 2
-// Setelah gambar 2, pergantian berikutnya normal (tanpa flip)
+// Alur:
+// 1. Double tap -> delay 1 detik -> kartu muncul (struktur flip card, front = preview-1)
+// 2. Tap kartu -> LANGSUNG flip 3D (tanpa delay) -> berubah ke back = preview-2
+// 3. Tap berikutnya -> delay 3 detik -> ganti gambar normal (tanpa flip) untuk preview-3,4,dst
+// 4. Setelah gambar terakhir -> delay 3 detik -> slide keluar ke atas
 
 let flipAnimationTimeout = null;
 let isFlipping = false;
@@ -10,6 +12,8 @@ let flipExitIndicatorTimeout = null;
 let flipExitCardTimeout = null;
 let isFlipAnimating = false;
 let flipCardElement = null; // Referensi ke elemen card flip
+let frontDiv = null;
+let backDiv = null;
 
 // Mendapatkan gambar untuk sisi front (gambar 1)
 function getFrontImageSrc() {
@@ -31,12 +35,17 @@ function setupFlipCardStructure() {
     const currentScale = scale;
     const currentWidth = card.offsetWidth;
     const currentHeight = card.offsetHeight;
+    const currentZIndex = card.style.zIndex;
     
     // Buat container baru
     const container = document.createElement('div');
     container.className = 'card-container';
     container.style.perspective = '1200px';
     container.style.display = 'inline-block';
+    container.style.position = 'absolute';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.zIndex = currentZIndex || '2';
     
     // Buat card flip
     const flipCard = document.createElement('div');
@@ -48,7 +57,7 @@ function setupFlipCardStructure() {
     flipCard.style.transition = 'transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1)';
     
     // Buat front side
-    const frontDiv = document.createElement('div');
+    frontDiv = document.createElement('div');
     frontDiv.className = 'card-face front';
     frontDiv.style.position = 'absolute';
     frontDiv.style.width = '100%';
@@ -58,9 +67,10 @@ function setupFlipCardStructure() {
     frontDiv.style.backgroundRepeat = 'no-repeat';
     frontDiv.style.backgroundPosition = 'center';
     frontDiv.style.backgroundImage = `url('${getFrontImageSrc()}')`;
+    frontDiv.style.borderRadius = '12px';
     
     // Buat back side
-    const backDiv = document.createElement('div');
+    backDiv = document.createElement('div');
     backDiv.className = 'card-face back';
     backDiv.style.position = 'absolute';
     backDiv.style.width = '100%';
@@ -71,6 +81,7 @@ function setupFlipCardStructure() {
     backDiv.style.backgroundRepeat = 'no-repeat';
     backDiv.style.backgroundPosition = 'center';
     backDiv.style.backgroundImage = `url('${getBackImageSrc()}')`;
+    backDiv.style.borderRadius = '12px';
     
     flipCard.appendChild(frontDiv);
     flipCard.appendChild(backDiv);
@@ -84,51 +95,67 @@ function setupFlipCardStructure() {
     parent.replaceChild(container, card);
     container.id = 'card-container';
     flipCard.id = cardId;
-    flipCard.style.cssText = cardStyle;
-    flipCard.style.width = currentWidth + 'px';
-    flipCard.style.height = currentHeight + 'px';
-    flipCard.style.position = 'absolute';
-    flipCard.style.left = '0';
-    flipCard.style.top = '0';
-    flipCard.style.transform = `translate(${currentPosX}px, ${currentPosY}px) scale(${currentScale})`;
     
-    // Update global card reference
+    // Set posisi
+    container.style.transform = `translate(${currentPosX}px, ${currentPosY}px) scale(${currentScale})`;
+    container.style.width = currentWidth + 'px';
+    container.style.height = currentHeight + 'px';
+    
+    // Update global card reference (point ke flipCard untuk transform)
     window.card = flipCard;
     card = flipCard;
     flipCardElement = flipCard;
     
+    // Sembunyikan back dulu (tampilkan front)
+    flipCardElement.classList.remove('flip');
+    
     return { flipCard, frontDiv, backDiv };
 }
 
-// Kembalikan kartu ke mode biasa (img element)
+// Kembalikan kartu ke mode biasa (img element) setelah effect selesai
 function teardownFlipCardStructure() {
-    if (!flipCardElement) return;
+    if (!flipCardElement && !frontDiv) return;
     
-    // Ambil src dari front image
-    const frontDiv = flipCardElement.querySelector('.front');
+    // Ambil src dari front image saat ini
     let currentSrc = '';
     if (frontDiv) {
         const bgImage = frontDiv.style.backgroundImage;
         currentSrc = bgImage.replace(/url\(["']?|["']?\)/g, '');
     }
     
-    // Ambil posisi saat ini
-    const currentPosX = posX;
-    const currentPosY = posY;
-    const currentScale = scale;
+    // Ambil posisi saat ini dari container
+    const container = document.getElementById('card-container');
+    let currentPosX = posX;
+    let currentPosY = posY;
+    let currentScale = scale;
+    
+    if (container) {
+        const transform = container.style.transform;
+        if (transform) {
+            const match = transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+            if (match) {
+                currentPosX = parseFloat(match[1]);
+                currentPosY = parseFloat(match[2]);
+            }
+            const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+            if (scaleMatch) {
+                currentScale = parseFloat(scaleMatch[1]);
+            }
+        }
+    }
     
     // Hapus container dan buat img baru
-    const container = document.getElementById('card-container');
     if (container && container.parentNode) {
         const img = document.createElement('img');
         img.id = 'card';
-        img.src = currentSrc;
+        img.src = currentSrc || getFrontImageSrc();
         img.style.position = 'absolute';
         img.style.maxWidth = currentCardSize + 'px';
         img.style.transform = `translate(${currentPosX}px, ${currentPosY}px) scale(${currentScale})`;
         img.style.display = 'block';
         img.style.visibility = 'visible';
         img.style.opacity = '1';
+        img.style.zIndex = '2';
         
         container.parentNode.replaceChild(img, container);
         
@@ -136,6 +163,8 @@ function teardownFlipCardStructure() {
         window.card = img;
         card = img;
         flipCardElement = null;
+        frontDiv = null;
+        backDiv = null;
         
         updateCardTransform();
     }
@@ -156,12 +185,24 @@ function showCardFlip() {
     // Setup flip card structure seperti contoh
     setupFlipCardStructure();
     
-    // Pastikan kartu tidak dalam keadaan flip
+    // Pastikan kartu tidak dalam keadaan flip (tampilkan front)
     if (flipCardElement) {
         flipCardElement.classList.remove('flip');
     }
     
-    // Atur posisi kartu
+    // Update front image dengan gambar preview-1
+    const frontImageSrc = getFrontImageSrc();
+    if (frontDiv && frontImageSrc) {
+        frontDiv.style.backgroundImage = `url('${frontImageSrc}')`;
+    }
+    
+    // Update back image dengan gambar preview-2
+    const backImageSrc = getBackImageSrc();
+    if (backDiv && backImageSrc) {
+        backDiv.style.backgroundImage = `url('${backImageSrc}')`;
+    }
+    
+    // Setup posisi kartu di tengah
     const cardWidth = card.offsetWidth;
     const cardHeight = card.offsetHeight;
     
@@ -171,7 +212,11 @@ function showCardFlip() {
     posX = Math.round(centerX);
     posY = Math.round(centerY);
     
-    card.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    const container = document.getElementById('card-container');
+    if (container) {
+        container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }
+    
     card.style.opacity = '1';
     card.style.visibility = 'visible';
     
@@ -198,19 +243,22 @@ function flipToSecondImage() {
             hasFlippedToSecond = true;
         } else if (activeImagesList.length === 2) {
             hasFlippedToSecond = true;
+            // Jika hanya 2 gambar, schedule exit
+            isSequenceActive = false;
+            sequenceStage = 0;
+            scheduleExitFlip();
         }
         return false;
     }
     
     isFlipping = true;
     
-    // Update back image dengan gambar preview-2
-    const backDiv = flipCardElement.querySelector('.back');
+    // Update back image dengan gambar preview-2 (pastikan sudah benar)
     if (backDiv) {
         backDiv.style.backgroundImage = `url('${backImageSrc}')`;
     }
     
-    // Tambah class flip untuk animasi 3D (seperti contoh)
+    // Tambah class flip untuk animasi 3D (rotateY 180 derajat)
     flipCardElement.classList.add('flip');
     
     // Setelah animasi flip selesai (0.6 detik)
@@ -220,12 +268,11 @@ function flipToSecondImage() {
         sequenceStage = 2;
         
         // Update front image dengan gambar ke-2 (setelah flip balik)
-        const frontDiv = flipCardElement.querySelector('.front');
         if (frontDiv) {
             frontDiv.style.backgroundImage = `url('${backImageSrc}')`;
         }
         
-        // Hapus class flip untuk kembali ke posisi normal
+        // Hapus class flip untuk kembali ke posisi normal (tapi sekarang menampilkan gambar ke-2 di front)
         flipCardElement.classList.remove('flip');
         
         // Tandai sudah melakukan flip ke gambar kedua
@@ -253,13 +300,8 @@ function goToNextImageFlipNormal(currentIndex) {
         const newSrc = activeImagesList[nextIndex].src;
         
         // Update front image
-        if (flipCardElement) {
-            const frontDiv = flipCardElement.querySelector('.front');
-            if (frontDiv) {
-                frontDiv.style.backgroundImage = `url('${newSrc}')`;
-            }
-        } else {
-            card.src = newSrc;
+        if (frontDiv) {
+            frontDiv.style.backgroundImage = `url('${newSrc}')`;
         }
         
         currentCardImageIndex = nextIndex;
@@ -269,7 +311,9 @@ function goToNextImageFlipNormal(currentIndex) {
     return false;
 }
 
+// Exit kartu ke atas (seperti skating)
 function exitCardFlipUp() {
+    if (!card) return;
     if (card.style.display === 'none') return;
     
     isAnimatingMotion = true;
@@ -278,8 +322,24 @@ function exitCardFlipUp() {
     card.classList.add('card-moving');
     card.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
     
+    // Dapatkan posisi saat ini dari container
+    const container = document.getElementById('card-container');
+    let currentPosX = posX;
+    
+    if (container) {
+        const transform = container.style.transform;
+        if (transform) {
+            const match = transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+            if (match) {
+                currentPosX = parseFloat(match[1]);
+            }
+        }
+    }
+    
     const targetY = -card.offsetHeight - 100;
-    card.style.transform = `translate(${posX}px, ${targetY}px) scale(${scale})`;
+    if (container) {
+        container.style.transform = `translate(${currentPosX}px, ${targetY}px) scale(${scale})`;
+    }
     
     setTimeout(() => {
         hideCard();
@@ -295,6 +355,7 @@ function exitCardFlipUp() {
 }
 
 function scheduleExitFlip() {
+    if (!card) return;
     if (card.style.display === 'none' || !isSequenceActive) return;
     
     if (flipExitIndicatorTimeout) clearTimeout(flipExitIndicatorTimeout);
@@ -321,9 +382,10 @@ function handleFlipCardTap() {
     
     if (touchToChangeTimeout) clearTimeout(touchToChangeTimeout);
     
-    // CEK: Apakah ini transisi dari gambar 1 ke gambar 2?
+    // CEK: Apakah ini transisi dari gambar 1 ke gambar 2? (BELUM pernah flip)
     if (!hasFlippedToSecond && currentCardImageIndex === 0) {
-        // Transisi 1 → 2: LANGSUNG flip 3D (tanpa delay)
+        // Transisi 1 → 2: LANGSUNG flip 3D (tanpa delay 3 detik)
+        console.log("Flip 3D: Transisi 1→2 dengan flip animasi");
         flipToSecondImage();
         return;
     }
@@ -332,19 +394,27 @@ function handleFlipCardTap() {
     const activeCount = activeImagesList.length;
     
     if (sequenceStage < activeCount) {
+        console.log("Flip 3D: Transisi normal dengan delay 3 detik ke gambar ke-" + (sequenceStage + 1));
         touchToChangeTimeout = setTimeout(() => {
             if (isSequenceActive) {
                 const success = goToNextImageFlipNormal(currentCardImageIndex);
                 if (!success) {
+                    // Semua gambar sudah habis
                     isSequenceActive = false;
                     sequenceStage = 0;
                     scheduleExitFlip();
+                } else {
+                    // Setelah ganti gambar, cek apakah ini gambar terakhir
+                    if (sequenceStage === activeCount) {
+                        scheduleExitFlip();
+                    }
                 }
             }
             touchToChangeTimeout = null;
         }, 3000);
     } else {
         // Semua gambar sudah habis
+        console.log("Flip 3D: Semua gambar habis, schedule exit");
         isSequenceActive = false;
         sequenceStage = 0;
         scheduleExitFlip();
