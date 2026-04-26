@@ -206,9 +206,24 @@ function triggerCardTap() {
         }
     }
     else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
-        // Gunakan handler khusus untuk flip effect
         if (typeof handleFlipCardTap === 'function') {
             handleFlipCardTap();
+        } else {
+            // Fallback ke standar
+            if (sequenceStage < activeCount) {
+                touchToChangeTimeout = setTimeout(() => {
+                    if (isSequenceActive) {
+                        if (!goToNextImage()) {
+                            isSequenceActive = false;
+                            sequenceStage = 0;
+                        }
+                    }
+                    touchToChangeTimeout = null;
+                }, 3000);
+            } else {
+                isSequenceActive = false;
+                sequenceStage = 0;
+            }
         }
     }
 }
@@ -219,14 +234,13 @@ function triggerDoubleTapEffect() {
     clearAllTimeouts();
     hideIndicator();
     
-    // Reset flip effect jika ada (untuk memastikan kartu kembali ke mode normal)
+    // Reset flip effect jika ada
     if (typeof resetFlipEffect === 'function') {
         resetFlipEffect();
     }
     
     // CEK EFEK SHADOW
     if (shadowEffectCheckbox.checked) {
-        console.log("Shadow effect triggered");
         isSequenceActive = true;
         sequenceStage = 1;
         
@@ -240,7 +254,6 @@ function triggerDoubleTapEffect() {
     } 
     // CEK EFEK STANDAR
     else if (effectStandarCheckbox.checked) {
-        console.log("Standar effect triggered");
         isSequenceActive = false;
         
         sequenceTimer = setTimeout(() => {
@@ -251,7 +264,6 @@ function triggerDoubleTapEffect() {
     } 
     // CEK EFEK SLIDER
     else if (effectSliderCheckbox.checked) {
-        console.log("Slider effect triggered");
         const totalDelay = 4000;
         const indicatorDelay = 3000;
         
@@ -267,7 +279,6 @@ function triggerDoubleTapEffect() {
     } 
     // CEK EFEK SKATING
     else if (effectSkatingCheckbox.checked) {
-        console.log("Skating effect triggered");
         const totalDelay = 4000;
         const indicatorDelay = 3000;
         
@@ -283,7 +294,6 @@ function triggerDoubleTapEffect() {
     } 
     // CEK EFEK FLIP 3D
     else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
-        console.log("Flip 3D effect triggered");
         isSequenceActive = false;
         
         sequenceTimer = setTimeout(() => {
@@ -294,7 +304,6 @@ function triggerDoubleTapEffect() {
     
     // Jika tidak ada efek yang dipilih, lakukan efek standar default
     else {
-        console.log("No effect selected, using default (Standar)");
         isSequenceActive = false;
         
         sequenceTimer = setTimeout(() => {
@@ -354,7 +363,7 @@ function clearAllTimeouts() {
         shadowWaitTimeout = null;
     }
     
-    // Timeout untuk flip effect (animasi flip 3D)
+    // Timeout untuk flip effect
     if (typeof clearFlipTimeouts === 'function') {
         clearFlipTimeouts();
     }
@@ -1108,6 +1117,22 @@ card.addEventListener('touchend', (e) => {
         else if (effectFlipCheckbox && effectFlipCheckbox.checked) {
             if (typeof handleFlipCardTap === 'function') {
                 handleFlipCardTap();
+            } else {
+                // Fallback ke standar
+                if (sequenceStage < activeCount) {
+                    touchToChangeTimeout = setTimeout(() => {
+                        if (isSequenceActive) {
+                            if (!goToNextImage()) {
+                                isSequenceActive = false;
+                                sequenceStage = 0;
+                            }
+                        }
+                        touchToChangeTimeout = null;
+                    }, 3000);
+                } else {
+                    isSequenceActive = false;
+                    sequenceStage = 0;
+                }
             }
         }
     }, 50);
