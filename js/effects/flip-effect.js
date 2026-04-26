@@ -1,5 +1,5 @@
 // ===== FLIP 3D EFFECT =====
-// Sederhana seperti effect standar, tapi kartu keluar ke atas setelah gambar terakhir
+// Sederhana seperti effect standar, tapi setelah gambar terakhir kartu keluar ke atas
 
 let flipExitIndicatorTimeout = null;
 let flipExitCardTimeout = null;
@@ -66,7 +66,7 @@ function goToNextImageFlip() {
 }
 
 function exitCardFlipUp() {
-    if (card.style.display === 'none' || !isSequenceActive) return;
+    if (card.style.display === 'none') return;
     
     isAnimatingMotion = true;
     
@@ -88,6 +88,7 @@ function exitCardFlipUp() {
 function scheduleExitFlip() {
     if (card.style.display === 'none' || !isSequenceActive) return;
     
+    // Bersihkan timeout sebelumnya
     if (flipExitIndicatorTimeout) {
         clearTimeout(flipExitIndicatorTimeout);
         flipExitIndicatorTimeout = null;
@@ -97,7 +98,7 @@ function scheduleExitFlip() {
         flipExitCardTimeout = null;
     }
     
-    // Tampilkan indikator setelah 3 detik
+    // Tampilkan indikator setelah 3 detik (sama seperti skating)
     flipExitIndicatorTimeout = setTimeout(() => {
         if (isSequenceActive) {
             showIndicator();
@@ -105,7 +106,7 @@ function scheduleExitFlip() {
         flipExitIndicatorTimeout = null;
     }, 3000);
     
-    // Exit kartu setelah 4 detik
+    // Exit kartu setelah 4 detik (sama seperti skating)
     flipExitCardTimeout = setTimeout(() => {
         if (isSequenceActive) {
             hideIndicator();
@@ -118,27 +119,41 @@ function scheduleExitFlip() {
 function handleFlipCardTap() {
     if (!isSequenceActive || !isCardVisible()) return;
     
+    // Hapus timeout yang sedang berjalan untuk exit
+    if (flipExitIndicatorTimeout) {
+        clearTimeout(flipExitIndicatorTimeout);
+        flipExitIndicatorTimeout = null;
+    }
+    if (flipExitCardTimeout) {
+        clearTimeout(flipExitCardTimeout);
+        flipExitCardTimeout = null;
+    }
+    
     if (touchToChangeTimeout) {
         clearTimeout(touchToChangeTimeout);
     }
     
     const activeCount = activeImagesList.length;
     
+    // Cek apakah ini gambar terakhir
+    const isLastImage = (sequenceStage === activeCount);
+    
     if (sequenceStage < activeCount) {
         // Masih ada gambar berikutnya
         touchToChangeTimeout = setTimeout(() => {
             if (isSequenceActive) {
-                if (!goToNextImageFlip()) {
-                    isSequenceActive = false;
-                    sequenceStage = 0;
+                goToNextImageFlip();
+                
+                // Setelah ganti gambar, cek apakah itu gambar terakhir
+                if (sequenceStage === activeCount) {
+                    // Ini gambar terakhir, schedule exit
+                    scheduleExitFlip();
                 }
             }
             touchToChangeTimeout = null;
         }, 3000);
-    } else {
-        // Gambar terakhir sudah tampil, schedule exit ke atas
-        isSequenceActive = false;
-        sequenceStage = 0;
+    } else if (isLastImage && activeCount > 0) {
+        // Ini gambar terakhir, langsung schedule exit (tanpa perlu tap lagi)
         scheduleExitFlip();
     }
 }
